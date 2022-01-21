@@ -61,7 +61,19 @@
 
 - 엔티티를 영구 저장하는 환경
 
+- 엔티티를 식별자 값(@id로 테이블의 기본 키와 매핑한 값)으로 구분한다.
+
+  ```java
+  @Entity
+  public class Member{
+  	@Id
+  	private Long id;
+  	private String name;
+  }
+  ```
+
 - ```java
+  // 엔티티 영속
   EntitiyManger.persist(entity);
   ```
 
@@ -190,7 +202,234 @@ tx.commit();
 4. 쓰기 지연 저장소의 SQL을 DB로 보낸다.
 5. 데이터베이스 트랜잭션을 커밋한다.
 
-## 플러시
+### 플러시
+
+- 영속성 컨텍스트의 변경내용을 데이터베이스에 반영한다.
+- 플러시 실행 메커니즘
+  1. 변경 감지 동작(모든 엔티티를 스냅샷과 비교)
+  2. 수정된 엔티티는 수정쿼리를 만들어 **쓰기 지연 SQL저장소** 등록
+  3. 쓰기 지연 SQL 저장소의 쿼리를 DB에 전송
+- **플러시를 한다고 1차 캐시가 사라지는 것은 아니다.(영속성 컨텍스트에 보관된 엔티티는 유지된다.) **
+- **변경된 내용을 DB에 적용하는 것 뿐이다.**
+
+**플러시하는 방법**
+
+1. em.flush() 직접 호출
+2. 트랙잭션 커밋시 플러시가 자동 호출
+3. JPQL 쿼리 실행시 플러시가 자동 호출
+
+- 직접 호출은 자주 사용하지는 않는다.
+
+### 준영속 상태
+
+- 영속상태 -> 준영속 상태
+- 영속 상태의 엔티티가 영속성 컨텍스트에서 분리(detached)
+- 영속성 컨텍스트가 제공하는 기능을 사용 못함
+
+### 트랜잭션 범위의 영속성 컨텍스트
+
+- @Transaction 어노테이션 
+
+  ![image](https://user-images.githubusercontent.com/77170611/150523895-f1c97065-5ec8-4559-ac49-db90259c7bf7.png)
+
+- 트랜잭션이 같으면 같은 영속성 컨텍스트 사용한다.
+
+  ![image](https://user-images.githubusercontent.com/77170611/150524091-a4decf43-2d30-482f-a715-5ca38e5410d0.png)
+
+- 트랜잭션이 다르면 다른 영속성 컨텍스트를 사용한다.
+
+  ![image](https://user-images.githubusercontent.com/77170611/150524107-f4fde9eb-dc30-4ea7-b97f-bb820d437191.png)
+
+## 엔티티 매핑
+
+### 엔티티 매핑 소개
+
+|        매핑        |       어노테이션        |
+| :----------------: | :---------------------: |
+| 객체와 테이블 매핑 |     @Entity, @Table     |
+|    기본 키 매핑    |           @Id           |
+|  필드와 컬럼 매핑  |         @Column         |
+|   연관관계 매핑    | @ManyToOne, @JoinColumn |
+
+### @Entity
+
+- @Entity가 붙은 **클래스**는 JPA가 관리, **엔티티라고 한다.**
+
+- JPA를 사용해서 테이블과 매핑할 클래스는 **@Entity**가 필수이다.
+
+- 기본 생성자를 필수로 작성해주자(파라미터가 없는 public 또는 protected 생성자)
+
+- final클래스, enum, interface, inner 클래스에는 사용할 수 없다.
+
+- 저장할 필드에 final을 사용하면 안된다.
+
+  ```java
+  @Entity
+  public class Member{
+      private Long id;
+      private String name;
+  }
+  
+  // 기본 생성자를 생성해준다.
+  public Member(){}
+  
+  // 사용할 생성자 
+  public Member(Long id, String name){
+      this.id = id;
+      this.name = name;
+  }
+  ```
+
+### @Table
+
+- 엔티티와 매핑할 테이블을 지정한다.
+
+  ```java
+  @Entity
+  @Table(name="MEMBER")
+  public class Member{
+      ...
+  }
+  ```
+
+### 데이터베이스 스키마 자동 생성
+
+- DDL(Date Definition Language)을 애플리케이션 실행 시점에 자동 생성
+
+- |    옵션     |                      설명                       |
+    | :---------: | :---------------------------------------------: |
+    |   create    |   기존테이블 삭제 후 다시 생성(DROP + CREATE)   |
+    | create-drop |     create와 같으나 종료시점에 테이블 DROP      |
+    |   update    | 변경분만 반영(운영DB에는 절대 사용하면 안된다.) |
+    |  validate   |    엔티티와 테이블이 정상 매핑되었는지 확인     |
+    |    none     |                  사용하지 않음                  |
+
+- ```java
+  <property name="hibernate.hbm2ddl.auto" value="create" />
+  ```
+
+- **validate 또는 none만 사용할 것을 권장한다!!**
+
+### 다양한 매핑 사용
+
+```java
+@Entity 
+public class Member { 
+ 
+    @Id // Pk로 매핑
+    private Long id; 
+
+    // 컬럼 매핑
+    @Column(name = "name") 
+    private String username; 
+    
+    private Integer age; 
+
+    // 자바 enum 타입을 매핑할 떄 사용
+    @Enumerated(EnumType.STRING) 
+    private RoleType roleType; 
+
+    // 날짜 타입을 매핑할 때 사용
+    @Temporal(TemporalType.TIMESTAMP) 
+    private Date createdDate; 
+
+    @Temporal(TemporalType.TIMESTAMP) 
+    private Date lastModifiedDate; 
+
+    @Lob 
+    private String description; 
+    
+    // 주로 메모리상에만 임시로 어떤 값을 저장할 때 사용 ---> DB에 반영 되지 않는다.
+    @Transient
+    private int tmp;
+}
+```
+
+**@Enumerate**
+
+- 기본값이 ORDINAL이다 : enum 순서를 데이터베이스에 저장한다.(0, 1, ,2 ...)
+- **ORDINAL값으로 저장하게 되면 변경이 있을 때 그 전 데이터는 변하지 않기 때문에 큰 문제를 야기할 수 있다!!!**
+- 거의 무조건 **EnumType.STRING (: enum 이름을 데이터베이스에 저장)**을 사용
+
+### 기본 키 매핑
+
+- **@Id**
+- **@GeneratedValue(기본값: 자동생성)**
+
+```java
+public class Member{
+
+	@Id @GeneratedValue
+	private Long id;
+}
+```
+
+### 데이터 중심 설계의 문제점
+
+- 객체 설계를 테이블 설계에 맞추게 되면 **테이블의 외래키를 객체에 그대로 가져오게 된다.**
+- 객체 그래프 탐색이 불가능 하다.
+- 참조가 없으므로 UML(통합모델링언어) 도 잘못되었다.
+
+```java
+// order를 주문한 멤버를 찾고자 할때  ---> 객체지향적이지 않다.
+Order order = em.find(Order.class, 1L);
+Long memberId = order.getMemberId();
+
+Member member = em.find(Member.class, memebrId);
+```
+
+## 연관관계 매핑 
+
+- 방향 : 단방향, 양방향
+- 다중성: 다대일(N:1), 일대다(1:N), 일대일(1:1), 다대다(N:M)
+- 연관관계의 주인(Owner): 객체를 양방향 연관관계로 만들면 **연관관계의 주인을 정해야 한다.**
+
+
+
+### 단방향 연관관계
+
+**연관관계가 없는 객체인 경우** -> 외래 키 식별자를 직접 다룬다.
+
+![image](https://user-images.githubusercontent.com/77170611/150561529-8f75c016-0974-4900-8233-5f76d9cea5c9.png)
+
+
+
+**객체 연관관계를 사용한 경우**
+
+![image](https://user-images.githubusercontent.com/77170611/150562260-14fec799-2b66-4d8f-a4f4-f5ccd7b5860d.png)
+
+```java
+// Member 
+@ManyToOne // 멤버 입장에서 봐야한다. 멤버가 N이고 One인 Team으로 매핑한다.
+@JoinColumn(name = "TEAM_ID")
+private Team team;
+```
+
+```java
+// 팀 저장
+Team team = new Team();
+team.setName("TeamA");
+em.persist(team);
+
+// 회원 저장
+Member member = new Member();
+member.setUsername("member1");
+// JPA가 알아서 team에서 Pk값을 꺼내서 INSERT할때 FK으로 사용한다.
+member.setTeam(team);
+em.persist(member);
+```
+
+- @ManyToOne
+  - 다대일(N:1) 관계라는 매핑 정보
+  - 어노테이션 필수
+- @JoinColumn(name="TEAM_ID")
+  - 외래키(FK)를 매핑할 때 사용
+  - name 속성에 매핑할 외래 키 이름을 지정한다.
+  - 생략 가능하다.
+
+
+
+
 
 
 
