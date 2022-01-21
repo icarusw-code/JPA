@@ -15,13 +15,7 @@ public class JpaMain {
         tx.begin();
 
         try {
-            Member member = new Member(1000L, "member1000");
-            em.persist(member);
 
-            // 1차 캐시는 유지된다.
-            em.flush();
-
-            System.out.println("===================");
             tx.commit();
         } catch (Exception e) {
             tx.rollback();
