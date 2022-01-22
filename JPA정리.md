@@ -378,7 +378,7 @@ Long memberId = order.getMemberId();
 Member member = em.find(Member.class, memebrId);
 ```
 
-## 연관관계 매핑 
+## 연관관계 매핑 - 연관관계
 
 - 방향 : 단방향, 양방향
 - 다중성: 다대일(N:1), 일대다(1:N), 일대일(1:1), 다대다(N:M)
@@ -386,7 +386,7 @@ Member member = em.find(Member.class, memebrId);
 
 
 
-### 단방향 연관관계
+### 단방향 연관관계 
 
 **연관관계가 없는 객체인 경우** -> 외래 키 식별자를 직접 다룬다.
 
@@ -420,22 +420,307 @@ em.persist(member);
 ```
 
 - @ManyToOne
+
   - 다대일(N:1) 관계라는 매핑 정보
   - 어노테이션 필수
+
 - @JoinColumn(name="TEAM_ID")
+
   - 외래키(FK)를 매핑할 때 사용
+
+  - N:1 일때 N쪽에 Foreign Key 가 들어간다.(Foreign에 n이 들어가니까 맞춰준다고 외워두자 :thumbsup:  )
+
   - name 속성에 매핑할 외래 키 이름을 지정한다.
+
   - 생략 가능하다.
 
+    
+
+### 양방향 연관관계
+
+- **단방향 매핑만으로도 이미 연관관계 매핑은 완료된다.**
+- 반대 방향으로 조회 기능이 추가되는것이다. 
+- **단방향 매핑을 하고 양방향은 필요할 때 추가해도 된다. (테이블에 영향을 주지 않는다!)**
+
+![image](https://user-images.githubusercontent.com/77170611/150632524-14820d17-63e0-44ae-8277-19bc3cf7b31d.png)
+
+- **테이블 연관관계**에서는 **FK**로 양쪽을 다 갈 수 있다. ---> 사실 방향이 없는거라고 볼 수 있다.
+
+- **객체 연관관계**에서는 둘 다 세팅을 해줘야 양쪽을 볼 수있다. --->사실 단방향이 2개라고 볼 수 있다.
+
+  - 회원 -> 팀 연관관계 1개 (단방향)
+
+  - 팀 -> 회원 연관관계 1개 (단방향)
+
+  - ```java
+    class A{
+    	B b;
+    }
+    =================================================================================
+    class B{
+    	A a;
+    }
+    ```
+
+**:thumbsup:연관관계의 주인(Owner)**
+
+- 객체의 두 관계중 하나를 연관관계의 주인으로 지정해야한다!!
+- 연관관계의 주인만이 외래 키를 관리한다.(등록, 수정)
+- 주인이 아닌쪽은 읽기만 가능하다.
+- 주인이 아닌쪽은 mappedBy 속성으로 주인을 지정해줘야 한다.
+- **:star2: 항상 N쪽, 외래 키를 가진쪽이 주인이다. :star2:**
+
+​	![image](https://user-images.githubusercontent.com/77170611/150633068-a6380874-52fe-4c53-8405-836e5ff5fee6.png)
 
 
 
+**양방향 매핑시 주의 점**
+
+- 연관관계의 주인에 값을 입력하지 않았을 때 ---> 값이 반영되지 않는다.(읽는 역할만 하기 때문)
+
+  ```java
+  Team team = new Team();
+  team.setName("TeamA");
+  em.persist(team);
+  
+  Member member = new Member();
+  member.setName("member1");
+  
+  // 역방향(주인이 아닌 방향)만 연관 관계 설정
+  team.getMember().add(member);
+  
+  em.persist(member);
+  ```
+
+  ![image](https://user-images.githubusercontent.com/77170611/150628435-09e8ba12-43f1-4532-aa05-c46361839f00.png)
 
 
 
+- 연관관계 주인에 값을 입력했을 때 ---> 순수한 객체 관계를 고려하면 항상 양쪽 다 값을 입력해야 한다.
+
+  ```java
+  Team team = new Team();
+  team.setName("TeamA");
+  em.persist(team);
+  
+  Member member = new Member();
+  member.setName("member1");
+  
+  team.getMember().add(member);
+  // 연관관계의 주인에 값 설정
+  member.setTeam(team);
+  
+  em.persist(member);
+  ```
+
+  ![image](https://user-images.githubusercontent.com/77170611/150628487-3836ffe2-0800-4090-9dca-0120c45bbbe4.png)
 
 
 
+**연관관계 편의 메소드 생성**
+
+- 순수 객체 상태를 고려해서 항상 양쪽에 값을 설정한다.
+
+- 연관관계 편의 메소드를 생성하면 오류를 줄일 수 있다.
+
+  ```java
+  Team team = new Team();
+  team.setName("TeamA");
+  em.persist(team);
+  
+  Member member = new Member();
+  member.setName("member1");
+  
+  // 연관관계 편의 메소드를 생성
+  member.changeTeam(team);
+  
+  em.persist(member);
+  ```
+
+  ```java
+  public class Member{
+  	....
+  	
+  	public void changeTeam(Team team){
+  		this.team = team;
+          // team쪽에도 변경된 결과를 반영시켜준다.
+  		team.getMembers().add(this);
+  	}
+  }
+  ```
+
+## 연관관계 매핑 - 다중성
+
+### 다대일[ N:1 ]
+
+**단방향**
+
+- **:star2:가장 많이 사용하는 연관 관계**
+- ![image](https://user-images.githubusercontent.com/77170611/150647138-46d1a4ca-9a22-4f07-bb3f-a163e0c645fd.png)
+
+**양방향**
+
+- 외래 키가 있는 쪽이 연관관계의 주인이다. 
+- 양쪽을 서로 참조하도록 개발
+
+
+
+### 일대다[ 1:N ]
+
+**N : 1 관계를 되도록이면 사용하도록 하자!!!**
+
+**단방향**
+
+- ![image](https://user-images.githubusercontent.com/77170611/150647083-47179d48-d36c-47d9-9f94-24924087c432.png)
+
+- One(1)이 연관관계의 주인이다.
+
+- 테이블 1 : N 관계는 항상 Many(N) 쪽에 외래 키가 있다.
+
+- 객체와 테이블의 차이 때문에 반대편 테이블의 외래 키를 관리하는 이상한 구조이다.
+
+  -> 연관관계 관리를 위해 추가로 UPDATE SQL을 실행한다.
+
+- @JoinColumn을 꼭 사용해야 한다.
+
+**양방향**
+
+- ![image](https://user-images.githubusercontent.com/77170611/150647287-f78529a9-2204-48e9-8ccf-351a88ff371f.png)
+
+- 공식적으로 존재하지 않는다.
+- @JoinColumn(insertable = false, updateable = false) 를 사용해서 억지로 가능하다.
+
+
+
+### 일대일[ 1: 1 ]
+
+주 테이블이나 대상 테이블 중에 외래 키 선택 가능하다. 
+
+* 자주 사용되는 테이블을 주 테이블 개념으로 잡고가면 된다.
+
+외래 키에 데이터베이스 유니크(UNI) 제약조건 추가
+
+**주 테이블에 외래 키 단방향**
+
+- ![image](https://user-images.githubusercontent.com/77170611/150647463-f13c5ad1-4b47-4fe9-be3f-8f59a4d36569.png)
+
+
+
+**주 테이블에 외래 키 양방향**
+
+- ![image](https://user-images.githubusercontent.com/77170611/150647536-f69c24ee-a23b-4dc9-af92-64bc62b3d458.png)
+- **외래 키가 있는 곳이 연관관계의 주인이다.**
+- 반대쪽은 mappedBy 적용
+
+
+
+**대상 테이블에 외래 키 양방향**
+
+- ![image](https://user-images.githubusercontent.com/77170611/150647672-4fe7734e-8bb6-4c4b-8873-52aa27afa37b.png)
+- 방법은 주 테이블 외래 키 양방향과 동일하다.
+
+
+
+**주 테이블 vs 대상 테이블 외래 키**
+
+**-> 주 테이블에 외래 키를 사용하도록 하자**
+
+|          |                     주 테이블에 외래 키                      |                    대상 테이블에 외래 키                     |
+| :------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
+| **장점** | 주 테이블만 조회해도 대상 테이블에 데이터가 있는지 확인 가능 | 주 테이블과 대상 테이블을 일대일에서 일대다 관계로 변경할 때 테이블 구조 유지 |
+| **단점** |               값이 없으면 외래 키에 null 허용                | 프록시 기능의 한계로 지연로딩으로 설정해도 항상 즉시 로딩된다. |
+
+
+
+### 다대다[ N:M ]
+
+**:stop_sign: 결론적으로 사용하지 말자**
+
+- 관계형 데이터베이스는 정규화된 테이블 2개로 다대다 관계를 표현할 수 없다
+
+  --> 연결 테이블을 추가해서 일대다, 다대일 관계로 풀어내야 한다.
+
+  ![image](https://user-images.githubusercontent.com/77170611/150647948-c2db55f1-e971-49f5-bcc8-59f6dd473b6e.png)
+
+- 객체는 컬렉션을 사용해서 객체 2개로 다대다 관계가 가능하다.
+
+  ![image](https://user-images.githubusercontent.com/77170611/150647966-e3072f7f-3241-4d61-8d5e-fd802098f328.png)
+
+- @ManyToMany 사용 
+- @JoinTable로 연결 테이블 지정
+
+
+
+**다대다 매핑의 한계**
+
+![image](https://user-images.githubusercontent.com/77170611/150648253-ed629287-25a3-4934-9b62-afc1da461c9d.png)
+
+- 연결 테이블이 단순히 연결만 하고 끝나지 않는다. 
+
+  --> 조인 테이블에 주문시간, 주문수량 같은 추가 데이터가 들어갈 수 있다.
+
+- 매핑 정보를 넣는 것은 가능하지만, 추가 정보를 넣는 것 자체가 불가능하다.
+- 중간 테이블이 숨겨져 있기 때문에 예상하지 못하는 쿼리들이 나간다.
+- **이런 문제들 때문에 실무에서는 사용하지 않는것을 권장한다!!**
+
+
+
+**다대다 한계 극복**
+
+![image](https://user-images.githubusercontent.com/77170611/150648357-018c0527-a1fc-4490-9fbb-a67bdfadb860.png)
+
+- 연결 테이블용 엔티티를 추가한다(**연결 테이블을 엔티티로 승격**)
+
+  -> JPA가 만들어주는 숨겨진 매핑테이블의 존재를 바깥으로 꺼내는 것이다.
+
+- @ManyToMany --> @OneToMany & @ManyToOne 로 관계를 맺어준다.
+
+- MemberProduct의 MEMBER_ID, PRODUCT_ID를 묶어서 PK로 사용하지 말고 
+
+  --> **ORDER_ID 를 PK로 독립적으로 generated되는 id를 사용하는 것을 권장한다.**
+
+  --> ID가 2개의 테이블에 종속되지 않고 유연하게 개발이 가능하다.(PK를 운영중에 업데이트 하는 상황 대비)
+
+- ```java
+  // Member
+  @Entity
+  public class Member {
+      ...
+      @OneToMany(mappedBy = "member")
+      private List<MemberProduct> memberProducts = new ArrayList<>();
+      ...
+  }
+  ```
+
+- ```java
+  //Product
+  @Entity
+  public class Product {
+      ...
+      @OneToMany(mappedBy = "product")
+      private List<MemberProduct> members = new ArrayList<>();
+      ...
+  }
+  ```
+
+- ```java
+  //MemberProduct : 만약 추가 데이터가 들어가면 의미있는 엔티티 이름(Order)로 변경하면 된다.
+  @Entity
+  public class MemberProduct{
+      @Id @GenratedValue
+      private Long id;
+      
+      @ManyToOne
+      @JoinColumn(name = "MEMBER_ID")
+      private Member member;
+      
+      @ManyToOne
+      @JoinColumn(name = "PRODUCT_ID")
+      private Product product
+  }
+  ```
+
+  
 
 
 

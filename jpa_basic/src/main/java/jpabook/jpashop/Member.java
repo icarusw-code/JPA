@@ -12,14 +12,6 @@ public class Member {
     @Column(name = "USERNAME")
     private String username;
 
-//    @Column(name = "TEAM_ID")
-//    private Long teamId;
-
-    // 멤버 입장으로 볼것. 멤버가 N이고 One인 Team으로 매핑
-    @ManyToOne
-    @JoinColumn(name = "TEAM_ID")
-    private Team team;
-
     public Long getId() {
         return id;
     }
@@ -36,12 +28,4 @@ public class Member {
         this.username = username;
     }
 
-    public Team getTeam() {
-        return team;
-    }
-
-    public void changeTeam(Team team) {
-        this.team = team;
-        team.getMembers().add(this);
-    }
 }

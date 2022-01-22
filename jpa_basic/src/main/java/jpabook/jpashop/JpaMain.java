@@ -16,20 +16,15 @@ public class JpaMain {
         tx.begin();
 
         try {
-            // 저장
-            Team team = new Team();
-            team.setName("TeamA");
-            em.persist(team);
-
             Member member = new Member();
             member.setUsername("member1");
-            member.changeTeam(team); // 연관관계 편의 메소드를 생성
             em.persist(member);
 
-            em.flush();
-            em.clear();
+            Team team = new Team();
+            team.setName("teamA");
+            team.getMembers().add(member);
 
-
+            em.persist(team);
 
             tx.commit();
         } catch (Exception e) {

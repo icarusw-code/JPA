@@ -12,7 +12,8 @@ public class Team {
     private Long id;
     private String name;
 
-    @OneToMany(mappedBy = "team")
+    @OneToMany
+    @JoinColumn(name = "TEAM_ID")
     private List<Member> members = new ArrayList<>(); // 관례로 ArrayList로 초기화 시켜둔다. add 할때 null 이 안뜬다
 
     public Long getId() {
