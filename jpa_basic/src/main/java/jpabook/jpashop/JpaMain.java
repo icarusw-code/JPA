@@ -23,15 +23,13 @@ public class JpaMain {
 
             Member member = new Member();
             member.setUsername("member1");
-//            member.setTeamId(team.getId());
-            // JPA가 알아서 team에서 Pk값을 꺼내서 INSERT할때 FK으로 사용한다.
-            member.setTeam(team);
+            member.changeTeam(team); // 연관관계 편의 메소드를 생성
             em.persist(member);
 
-            Member findMember = em.find(Member.class, member.getId());
+            em.flush();
+            em.clear();
 
-            Team findTeam = findMember.getTeam();
-            System.out.println("findTeam.getName() = " + findTeam.getName());
+
 
             tx.commit();
         } catch (Exception e) {
