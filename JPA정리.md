@@ -852,29 +852,309 @@ Hibernate:
 
 
 
+## 프록시와 연관관계 관리
+
+**프록시를 사용하면 연관된 객체를 처음부터 조회하는 것이 아니라 실제 사용하는 시점에 DB에서 **
+
+**조회할 수 있다. 그러나 자주 사용하는 객체들은 조인을 사용해서 함께 조회하는 것이 효과적이다.**
 
 
 
+**프록시를 사용해야하는 이유**
+
+- 회원정보만 사용하는 곳에서 연관된 팀 엔티티까지 DB에서 조회해 두는 것은 효율적이지 않다.
+- JPA는 엔티티가 실제 사용될 때까지 DB조회를 지연하는 방법을 제공한다 -> **지연로딩**
 
 
 
----프록시를 써야하는 이유 
+### 프록시 객체 소개
+
+- 지연 로딩을 사용하기 위해서는 "가짜 객체"가 필요하다.
+
+- ```java
+  // 엔티티 직접 조회 - 영속성 컨텍스트에 없으면 DB조회
+  Member member = em.find(Member.class, 100L);
+  
+  // 엔티티를 실제 사용하는 시점까지 미루는 프록시 객체
+  Member member = em.getReference(Member.class, 100L);
+  ```
+
+- ![image](https://user-images.githubusercontent.com/77170611/151391305-0a7eca68-d58e-44bf-a208-68b81e70045c.png)
 
 
 
+### 프록시 특징
+
+- 실제 클래스를 상속받아서 만들어진다. 
+- 실제 클래스와 겉 모양이 같다. -> 사용하는 입장에선 구분하지 않고 사용하면 된다.
+- 프록시 객체는 실제 객체의 참조(target)를 보관한다.
+- 프록시 객체를 호출하면 프록시 객체는 실제 객체의 메소드를 호출한다.
+- ![image](https://user-images.githubusercontent.com/77170611/151391850-9be4d94b-b1bb-48bf-bca3-3bb9092272e5.png)
+
+- 프록시 객체는 처음 사용할 때 한번만 초기화 된다.
+- 프록시 객체가 초기화 되면 프록시 객체를 통해 실제 엔티티에 접근 가능하다.
+- 프록시 객체는 원본 엔티티를 상속받음 -> 타입 체크시 주의해야한다(== 대신 instance of 사용해야한다.)
+- 영송석 컨텍스트에 찾는 엔티티가 이미 있으면 em.getReference()를 호출해도 **실제 엔티티를 반환**한다.
+
+![image](https://user-images.githubusercontent.com/77170611/151392653-17e8d018-8046-4e15-a82e-319746f656a6.png)
 
 
---- cascade사용 조건 1.라이프사이클이 동일할때2.단일 소유자인경우
+
+### 즉시 로딩과 지연 로딩
+
+**지연 로딩(무조건 사용) **
+
+- LAZY를 사용해서 프록시로 조회
+
+```java
+@Entity
+public class Member{
+    @Id 
+    @GeneratedValue
+    private Long id;
+    
+    @Column(name = "USERNAME")
+    private String name;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "TEAM_ID")
+    private Team team;
+    ...
+}
+```
+
+![image](https://user-images.githubusercontent.com/77170611/151394770-9dee4516-ba04-4090-a4ab-4dc91d68b320.png)
+
+- Member member = em.find(Member.class, 1L);
+
+![image](https://user-images.githubusercontent.com/77170611/151397270-c84ad759-31e8-4ab3-84df-8ec5ff9a0161.png)
+
+- Team team = member.getTeam();
+
+  team.getName();
+
+  실제 team을 사용하는 시점에 초기화(DB조회)
+
+![image](https://user-images.githubusercontent.com/77170611/151395936-44d9a34d-52d7-4ace-b9fa-96b7bfe8f364.png)
+
+- 즉시 로딩을 적용하면 예상치 못한 SQL이 발생한다.
+- 즉시 로딩은 JPQL에서 N+1문제를 일으킨다.
 
 
 
+### 영속성 전이: CASCADE
+
+**특정 엔티티를 영속 상태로 만들 때 연관된 엔티티도 함께 영속 상태로 만들고 싶을 때 사용**
+
+​	예시) 부모 엔티티를 저장할 때 자식 엔티티도 함께 저장
+
+​	![image-20220128011218943](C:\Users\CHOI\AppData\Roaming\Typora\typora-user-images\image-20220128011218943.png)
+
+**영속성 전이: 저장**
+
+```java
+@Entity
+public class Parent {
+    ...
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.PERSIST)
+    private List<Child> children = new ArrayList<Child>();
+    ...
+}
+```
+
+![image](https://user-images.githubusercontent.com/77170611/151398652-f6b3beaf-3aaf-4dfc-89c6-64b58c7582f9.png)
+
+- 영속성 전이는 연관관계를 매핑하는 것과는 아무런 관련이 없다.
+- 엔티티를 영속화 할 때 연관된 엔티티도 함께 영속화하는 편리함을 제공한다.
+- **사용조건 1. 라이프 사이클이 동일 할때 2. 단일 소유자인 경우 사용하도록 하자**
 
 
 
+### 고아 객체
+
+- 고아 객체 제거: 부모 엔티티와 연관관계가 끊어진 자식 엔티티를 자동으로 삭제 해준다.
+
+- **orphanRemoval = true 사용**
+
+- ```java
+  @Entity
+  public class Parent {
+  
+      @Id @GeneratedValue
+      private Long id;
+  
+      @OneToMany(mappedBy = "parent", orphanRemoval = true)
+      private List<Child> children = new ArrayList<Child>();
+      ...
+  }
+  ```
+
+- 참조하는 곳이 하나일 때 사용해야 한다! 
+
+- 특정 엔티티가 개인 소유할 때 사용해야 한다!
+
+- @OneToOne, @OneToMany만 사용 가능하다.
 
 
 
+## 값 타입
+
+**JPA 데이터 타입 분류**
+
+- 엔티티 타입
+  - @Entity로 정의하는 객체
+  - 데이터가 변해도 식별자로 지속해서 추적 가능
+  - ex) 회원 엔티티의 키나 나이 값을 변경해도 식별자로 인식 가능
+- 값 타입
+  - int, Integer, String 처럼 단순히 값으로 사용하는 자바 기본 타입이나 객체
+  - 식별자가 없고 값만 있으므로 변경시 추적이 불가능
+  - ex) 숫자 100을 200으로 변경하면 완전히 다른 값으로 대체
+
+### 기본값 타입
+
+- ex) String name, int age
+
+- 생명주기를 엔티티의 의존
+
+  ex) 회원을 삭제하면 이름, 나이 필드도 함께 삭제
+
+- **값 타입은 공유하면 안된다.**
+
+  ex) 회원 이름 변경시 다른 회원의 이름도 함께 변경되면 안된다.
+
+- 항상 값을 복사한다.
 
 
 
+### 임베디드 타입(복합 값 타입)
 
+- 새로운 값 타입을 직접 정의할 수 있다.
+- JPA는 임베디드 타입 이라 한다.
+- 주로 기본 값 타입을 모아서 만들어서 복합 값 타입이라고도 한다.
+
+![image](https://user-images.githubusercontent.com/77170611/151401753-99ac40f6-cea7-47f7-a794-503f0465ad04.png)
+
+![image](https://user-images.githubusercontent.com/77170611/151402045-08d413e2-a2a1-4ef6-85e1-4b377c8624d0.png)
+
+
+
+**임베디드 타입 사용법**
+
+- @Embeddable: 값 타입을 정의하는 곳에 표시
+- @Embedded: 값 타입을 사용하는 곳에 표시
+- 기본 생성자는 필수이다
+
+
+
+**임베디드 타입의 장점**
+
+- 재사용
+- 높은 응집도
+- Period.isWork() 처럼 해당 값 타임만 사용하는 의미 있는 메소드를 만들 수 있다.
+- **임베디드 타입을 포함한 모든 값 타입은, 값 타입을 소유한 엔티티에 생명주기를 의존한다.**
+
+
+
+**임베디드 타입과 테이블 매핑**
+
+![image](https://user-images.githubusercontent.com/77170611/151402745-2ce71e5b-dc61-4093-95bb-6ab9120add76.png)
+
+- 임베디드 타입은 엔티티의 값일 뿐이다.
+- 임베디드 타입을 사용하기 전과 후에 매핑하는 **테이블은 변함이 없다**
+- 객체와 테이블을 아주 세밀하게 매핑하는 것이 가능하다.
+
+
+
+**@AttributeOverride: 속성 재정의**
+
+- 한 엔티티에서 같은 값 타입을 사용하면 -> 컬럼 명이 중복된다.
+- @AttributeOverrides, @AttributeOverride를 사용해서 컬럼 명 속성을 재정의
+
+
+
+### 값 타입과 불변 객체
+
+**값 타입 공유 참조**
+
+- 임베디드 타입 같은 값 타입을 여러 엔티티에서 공유하면 위험하다 -> 부작용(Side Effect) 발생
+
+![image](https://user-images.githubusercontent.com/77170611/151403634-6d619e05-fcdf-4bec-99bc-02d5b81bc24e.png)
+
+
+
+**값 타입 복사**
+
+- 값 타입의 실제 인스턴스 값을 공유하는 것은 위험하다.
+- 대신 값(인스턴스)를 **복사해서 사용**
+
+![image](https://user-images.githubusercontent.com/77170611/151403863-a399ea53-c08b-487b-b6d7-abe8d1f43145.png)
+
+
+
+**불변 객체**
+
+- 객체 타입을 수정할 수 없게 만들면 부작용을 원천 차단 할 수 있다
+- 값 타입은 불변 객체(immutable object)로 설계해야 한다.
+- **생성 시점 이후 절대 값을 변경 할 수 없는 객체**
+- 생성자로만 값을 설정하고 수정자(Setter)를 만들지 않는다!
+
+
+
+### 값 타입 컬렉션
+
+정말 값 타입이라 판단 될때만 사용하도록 한다.
+
+엔티티와 값 타입을 혼동해서 엔티티를 값 타입으로 만들면 안된다.
+
+**식별자가 필요하고, 지속해서 값을 추적, 변경을 해야 한다면 그것은 엔티티 이다.**
+
+![image](https://user-images.githubusercontent.com/77170611/151404789-0976ff22-1f79-4a32-b91c-3fa812f3e706.png)
+
+- 값 타입을 하나 이상 저장할 때 사용한다.
+- @ElementCollection, @CollectionTable사용
+- 데이터베이스는 컬렉션을 같은 테이블에 저장할 수 없다.
+- 컬렉션을 저장하기 위한 별도의 테이블이 필요하다.
+
+
+
+**값 타입 컬렉션의 제약사항**
+
+- 엔티티와 다르게 식별자 개념이 없다.
+
+- 값은 변경하면 추적이 어렵다.
+
+- 값 타입 컬렉션에 변경 사항이 발생하면, 주인 엔티티와 연관된 모든 데이터를 삭제하고, 현재값을 모두 다시 저장한다.
+
+- 값 타입 컬렉션을 매핑하는 테이블은 모든 컬럼을 묶어서 기본키를 구성해야 한다. 
+
+  null 입력 X , 중복 저장 X
+
+```
+//값타입 수정
+
+// homeCity --> newCity 
+// findMember.getHomeAddress().setCity("newCity"); 하면 큰일 난다. sideeffect유발
+
+// 값 전체를 새로 넣어줘야한다.
+Address a =findMember.getHomeAddress();
+findMember.setHomeAddress(new Address("newCity", a.getStreet(), a.getZipcode()));
+```
+
+```
+// 치킨 -> 한식
+findMember.getFavoriteFoods().remove("치킨");
+findMember.getFavoriteFoods().add("한식");
+```
+
+```
+// 관련된 모든 데이터를 삭제하고 남아있는 값을 다시 INSERT한다. 
+// 즉 전체를 지우고 남은 old2랑 newCity1 둘다 INSERT함
+findMember.getAddressHistory().remove(new Address("old1", "street", "10000"));
+findMember.getAddressHistory().add(new Address("newCity1", "street", "10000"));
+```
+
+**값 타입 컬렉션 대안**
+
+- 값 타입 컬렉션 대신에 일대다 관계를 고려
+- 일대다 관계를 위한 엔티티를 만들고, 여기에서 값 타입을 사용
+- 영속성 전이(Cascade) +  고아 객체 제거를 사용해서 값 타입 컬렉션 처럼 사용
